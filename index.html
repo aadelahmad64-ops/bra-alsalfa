@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>برا السالفة - لعبة الكذب</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            width: 100%;
+            max-width: 900px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .game-info {
+            display: flex;
+            gap: 15px;
+            color: #666;
+            flex-wrap: wrap;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 1.8em;
+        }
+
+        input, button {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .exit-btn {
+            background: #ff6b6b;
+            width: auto;
+            padding: 8px 15px;
+            font-size: 0.9em;
+        }
+
+        .kick-btn {
+            background: #ff6b6b;
+            width: auto;
+            padding: 4px 10px;
+            font-size: 0.8em;
+            margin-top: 5px;
+        }
+
+        .join-section, .create-section {
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 10px;
+            background: #f8f9fa;
+        }
+
+        .players-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 5px;
+        }
+
+        .player-card {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid transparent;
+            position: relative;
+        }
+
+        .player-card.host {
+            border-color: #ffd700;
+            background: #fff9e6;
+        }
+
+        .player-card .player-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 1.1em;
+        }
+
+        .player-card .score {
+            color: #667eea;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .player-card .you-badge {
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            display: inline-block;
+            margin-top: 5px;
+        }
+
+        .host-badge {
+            background: #ffd700;
+            color: #333;
+            padding: 2px 8px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            display: inline-block;
+            margin-top: 5px;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .question-box {
+            background: #667eea;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .question-box h3 {
+            margin-bottom: 10px;
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .question-box p {
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+
+        .answer-input {
+            margin: 20px 0;
+        }
+
+        .answers-status {
+            text-align: center;
+            color: #666;
+            font-size: 1.1em;
+            margin: 10px 0;
+        }
+
+        .reveal-section {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        #revealQuestionBtn {
+            background: #ff6b6b;
+            width: auto;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .answers-display {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 5px;
+        }
+
+        .answer-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid #e0e0e0;
+        }
+
+        .answer-card .player-name {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        .answer-card .answer-text {
+            font-size: 1.1em;
+            color: #333;
+            word-break: break-word;
+        }
+
+        .voting-section {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        #votingTimer {
+            font-size: 4em;
+            color: #ff6b6b;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        #votingButtons {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .vote-btn {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .vote-btn:hover:not(:disabled) {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .result-content {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .imposter-reveal {
+            background: #ff6b6b;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        .winner-reveal {
+            background: #48bb78;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        .game-winner {
+            background: #ffd700;
+            color: #333;
+            padding: 25px;
+            border-radius: 15px;
+            margin: 20px 0;
+            font-size: 1.3em;
+        }
+
+        #nextRoundBtn {
+            width: auto;
+            margin: 20px auto;
+            display: block;
+            padding: 15px 40px;
+            font-size: 1.2em;
+        }
+
+        .copy-btn {
+            background: #48bb78;
+            padding: 8px 15px;
+            font-size: 0.9em;
+            width: auto;
+            margin-right: 10px;
+        }
+
+        .link-box {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+
+        .link-box input {
+            margin: 0;
+            flex: 1;
+            background: white;
+        }
+
+        .loading-screen {
+            text-align: center;
+            padding: 50px;
+        }
+
+        .loading-screen .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #ff6b6b;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .player-actions {
+            margin-top: 8px;
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .game-header {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            h1 {
+                font-size: 1.5em;
+            }
+            
+            .question-box p {
+                font-size: 1.2em;
+            }
+
+            .header-buttons {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+    <!-- استيراد ملف الأسئلة المنفصل -->
+    <script src="questions.js"></script>
+</head>
+<body>
+    <div class="container" id="app">
+        <div class="loading-screen">
+            <h2>جاري تحميل اللعبة...</h2>
+            <div class="spinner"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // ===== استيراد Firebase =====
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getDatabase, ref, set, onValue, update, get, remove } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js';
+
+        // ===== إعدادات Firebase =====
+        const firebaseConfig = {
+            apiKey: "AIzaSyBgU2e3nrFc6k741ghQdB7UqqwNYaEvATk",
+            authDomain: "bra-alsalfa.firebaseapp.com",
+            databaseURL: "https://bra-alsalfa-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "bra-alsalfa",
+            storageBucket: "bra-alsalfa.firebasestorage.app",
+            messagingSenderId: "883405066643",
+            appId: "1:883405066643:web:13dffce9c91df1aea69866"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        // ===== متغيرات اللعبة =====
+        let playerId = null;
+        let gameCode = null;
+        let playerName = '';
+        let gameData = null;
+        let unsubscribe = null;
+        let timerInterval = null;
+        let presenceInterval = null;
+
+        // ===== التحقق من وجود كود في الرابط =====
+        const urlParams = new URLSearchParams(window.location.search);
+        const joinCode = urlParams.get('join');
+
+        // ===== دالة الاتصال باللعبة =====
+        async function connectToGame(code, id) {
+            if (unsubscribe) {
+                unsubscribe();
+                unsubscribe = null;
+            }
+            
+            gameCode = code;
+            playerId = id;
+            
+            try {
+                const gameRef = ref(database, 'games/' + gameCode);
+                
+                const snapshot = await get(gameRef);
+                if (!snapshot.exists()) {
+                    return false;
+                }
+                
+                gameData = snapshot.val();
+                
+                if (!gameData.players || !gameData.players[playerId]) {
+                    return false;
+                }
+                
+                unsubscribe = onValue(gameRef, (snapshot) => {
+                    const newData = snapshot.val();
+                    
+                    if (!newData) {
+                        cleanup();
+                        gameData = null;
+                        renderApp();
+                        return;
+                    }
+                    
+                    gameData = newData;
+                    updateGameScreen();
+                    
+                }, (error) => {
+                    console.error('Listener error:', error);
+                });
+                
+                startPresenceUpdates();
+                
+                return true;
+                
+            } catch (error) {
+                console.error('Connection error:', error);
+                return false;
+            }
+        }
+
+        // ===== تنظيف الاتصالات =====
+        function cleanup() {
+            if (unsubscribe) {
+                unsubscribe();
+                unsubscribe = null;
+            }
+            if (presenceInterval) {
+                clearInterval(presenceInterval);
+                presenceInterval = null;
+            }
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        // ===== تحديث آخر ظهور =====
+        function startPresenceUpdates() {
+            if (presenceInterval) clearInterval(presenceInterval);
+            
+            presenceInterval = setInterval(async () => {
+                if (!gameCode || !playerId) return;
+                try {
+                    await set(ref(database, `games/${gameCode}/players/${playerId}/lastSeen`), Date.now());
+                } catch (error) {
+                    console.error('Presence error:', error);
+                }
+            }, 5000);
+        }
+
+        // ===== دالة تحديث الشاشة =====
+        function updateGameScreen() {
+            if (!gameData) {
+                document.getElementById('app').innerHTML = '<div class="error">انتهت اللعبة</div>';
+                return;
+            }
+            
+            if (!gameData.players[playerId]) {
+                alert('تم طردك من اللعبة');
+                disconnectFromGame();
+                return;
+            }
+            
+            renderGameScreen();
+        }
+
+        // ===== قطع الاتصال =====
+        function disconnectFromGame() {
+            cleanup();
+            
+            gameCode = null;
+            playerId = null;
+            gameData = null;
+            localStorage.removeItem('bra-alsalfa');
+            renderApp();
+        }
+
+        // ===== الخروج من اللعبة =====
+        window.leaveGame = async function() {
+            if (!gameCode || !playerId) return;
+            
+            try {
+                await set(ref(database, `games/${gameCode}/players/${playerId}`), null);
+                
+                if (gameData && gameData.players[playerId]?.isHost) {
+                    const remainingPlayers = Object.keys(gameData.players).filter(id => id !== playerId);
+                    if (remainingPlayers.length > 0) {
+                        await set(ref(database, `games/${gameCode}/players/${remainingPlayers[0]}/isHost`), true);
+                    } else {
+                        await set(ref(database, `games/${gameCode}`), null);
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error leaving game:', error);
+            } finally {
+                disconnectFromGame();
+            }
+        };
+
+        // ===== طرد لاعب =====
+        window.kickPlayer = async function(targetId) {
+            if (!gameData || !gameData.players[playerId]?.isHost || targetId === playerId) return;
+            
+            try {
+                await set(ref(database, `games/${gameCode}/players/${targetId}`), null);
+            } catch (error) {
+                console.error('Error kicking player:', error);
+            }
+        };
+
+        // ===== دالة اختيار سؤال عشوائي (من الملف الخارجي) =====
+        function getRandomQuestion() {
+            // نستخدم المتغير العالمي QUESTIONS من ملف questions.js
+            if (window.QUESTIONS && window.QUESTIONS.length > 0) {
+                const randomIndex = Math.floor(Math.random() * window.QUESTIONS.length);
+                return window.QUESTIONS[randomIndex];
+            }
+            
+            // إذا ما تحملت الأسئلة لأي سبب، نرجع أسئلة افتراضية
+            return {
+                normal: "أفضل وقت في اليوم؟",
+                imposter: "أسوأ وقت في اليوم؟"
+            };
+        }
+
+        // ===== إنشاء غرفة =====
+        window.createGame = async function() {
+            const nameInput = document.getElementById('playerName');
+            if (!nameInput?.value.trim()) {
+                alert('الرجاء إدخال اسمك');
+                return;
+            }
+            
+            playerName = nameInput.value.trim();
+            const newCode = Math.floor(1000 + Math.random() * 9000).toString();
+            const newPlayerId = 'player1';
+            
+            try {
+                await set(ref(database, 'games/' + newCode), {
+                    players: {
+                        player1: {
+                            name: playerName,
+                            score: 0,
+                            isHost: true,
+                            lastSeen: Date.now()
+                        }
+                    },
+                    status: 'waiting',
+                    currentQuestion: null,
+                    imposterQuestion: null,
+                    answers: {},
+                    votes: {},
+                    imposterId: null,
+                    round: 0,
+                    createdAt: Date.now()
+                });
+                
+                const connected = await connectToGame(newCode, newPlayerId);
+                if (connected) {
+                    localStorage.setItem('bra-alsalfa', JSON.stringify({
+                        playerId: newPlayerId,
+                        gameCode: newCode,
+                        playerName
+                    }));
+                    renderApp();
+                } else {
+                    alert('فشل الاتصال باللعبة');
+                }
+                
+            } catch (error) {
+                console.error('Error creating game:', error);
+                alert('فشل إنشاء الغرفة: ' + error.message);
+            }
+        };
+
+        // ===== الانضمام لغرفة =====
+        window.joinGame = async function() {
+            const nameInput = document.getElementById('playerName');
+            const codeInput = document.getElementById('gameCode');
+            
+            if (!nameInput?.value.trim() || !codeInput?.value.trim()) {
+                alert('الرجاء إدخال الاسم وكود الغرفة');
+                return;
+            }
+            
+            const newName = nameInput.value.trim();
+            const newCode = codeInput.value.trim();
+            
+            try {
+                const snapshot = await get(ref(database, 'games/' + newCode));
+                if (!snapshot.exists()) {
+                    alert('الغرفة غير موجودة');
+                    return;
+                }
+                
+                const existingData = snapshot.val();
+                
+                const nameExists = Object.values(existingData.players || {}).some(p => 
+                    p.name.toLowerCase() === newName.toLowerCase()
+                );
+                
+                if (nameExists) {
+                    alert('الاسم مستخدم، اختر اسم آخر');
+                    return;
+                }
+                
+                const playersCount = Object.keys(existingData.players || {}).length;
+                const newPlayerId = 'player' + (playersCount + 1);
+                
+                await set(ref(database, `games/${newCode}/players/${newPlayerId}`), {
+                    name: newName,
+                    score: 0,
+                    isHost: false,
+                    lastSeen: Date.now()
+                });
+                
+                const connected = await connectToGame(newCode, newPlayerId);
+                if (connected) {
+                    localStorage.setItem('bra-alsalfa', JSON.stringify({
+                        playerId: newPlayerId,
+                        gameCode: newCode,
+                        playerName: newName
+                    }));
+                    renderApp();
+                } else {
+                    alert('فشل الاتصال باللعبة');
+                }
+                
+            } catch (error) {
+                console.error('Error joining game:', error);
+                alert('فشل الانضمام للعبة: ' + error.message);
+            }
+        };
+
+        // ===== بدء اللعبة =====
+        window.startGame = function() {
+            if (!gameData) return;
+            
+            const players = Object.keys(gameData.players);
+            
+            if (players.length < 2) {
+                alert('تحتاج 2 لاعبين على الأقل');
+                return;
+            }
+            
+            const nonHostPlayers = players.filter(p => !gameData.players[p].isHost);
+            const imposterId = nonHostPlayers[Math.floor(Math.random() * nonHostPlayers.length)] || players[1];
+            
+            const question = getRandomQuestion();
+            
+            const updates = {};
+            updates[`games/${gameCode}/status`] = 'playing';
+            updates[`games/${gameCode}/currentQuestion`] = question.normal;
+            updates[`games/${gameCode}/imposterQuestion`] = question.imposter;
+            updates[`games/${gameCode}/imposterId`] = imposterId;
+            updates[`games/${gameCode}/answers`] = {};
+            updates[`games/${gameCode}/votes`] = {};
+            updates[`games/${gameCode}/round`] = (gameData.round || 0) + 1;
+            
+            update(ref(database), updates).catch(error => {
+                console.error('Error starting game:', error);
+                alert('فشل بدء اللعبة');
+            });
+        };
+
+        // ===== إرسال إجابة =====
+        window.submitAnswer = function() {
+            const answer = document.getElementById('answerInput')?.value.trim();
+            if (!answer) {
+                alert('الرجاء كتابة إجابة');
+                return;
+            }
+            
+            const updates = {};
+            updates[`games/${gameCode}/answers/${playerId}`] = answer;
+            
+            update(ref(database), updates).then(() => {
+                const input = document.getElementById('answerInput');
+                if (input) input.value = '';
+            }).catch(error => {
+                console.error('Error submitting answer:', error);
+                alert('فشل إرسال الإجابة');
+            });
+        };
+
+        // ===== كشف السؤال =====
+        window.revealQuestion = function() {
+            const updates = {};
+            updates[`games/${gameCode}/status`] = 'voting';
+            update(ref(database), updates).catch(error => {
+                console.error('Error revealing question:', error);
+                alert('فشل كشف السؤال');
+            });
+        };
+
+        // ===== التصويت =====
+        window.submitVote = function(votedId) {
+            const updates = {};
+            updates[`games/${gameCode}/votes/${playerId}`] = votedId;
+            update(ref(database), updates).catch(error => {
+                console.error('Error submitting vote:', error);
+                alert('فشل تسجيل التصويت');
+            });
+        };
+
+        // ===== المؤقت =====
+        function startVotingTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            
+            let timeLeft = 5;
+            const timerElement = document.getElementById('votingTimer');
+            if (timerElement) timerElement.textContent = timeLeft;
+            
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                const timerEl = document.getElementById('votingTimer');
+                if (timerEl) timerEl.textContent = timeLeft;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    endVoting();
+                }
+            }, 1000);
+        }
+
+        function endVoting() {
+            if (!gameData) return;
+            
+            const votes = gameData.votes || {};
+            const imposterId = gameData.imposterId;
+            
+            let votesForImposter = 0;
+            for (let voterId in votes) {
+                if (votes[voterId] === imposterId) {
+                    votesForImposter++;
+                }
+            }
+            
+            const playersCount = Object.keys(gameData.players).length;
+            const imposterCaught = votesForImposter > (playersCount - votesForImposter);
+            
+            const updates = {};
+            
+            if (imposterCaught) {
+                for (let voterId in votes) {
+                    if (votes[voterId] === imposterId) {
+                        const currentScore = gameData.players[voterId]?.score || 0;
+                        updates[`games/${gameCode}/players/${voterId}/score`] = currentScore + 1;
+                    }
+                }
+                const imposterScore = gameData.players[imposterId]?.score || 0;
+                updates[`games/${gameCode}/players/${imposterId}/score`] = Math.max(0, imposterScore - 1);
+            } else {
+                const imposterScore = gameData.players[imposterId]?.score || 0;
+                updates[`games/${gameCode}/players/${imposterId}/score`] = imposterScore + 1;
+            }
+            
+            updates[`games/${gameCode}/status`] = 'result';
+            updates[`games/${gameCode}/lastResult`] = {
+                imposterId: imposterId,
+                caught: imposterCaught,
+                votes: votes
+            };
+            
+            update(ref(database), updates).catch(error => {
+                console.error('Error ending voting:', error);
+            });
+        }
+
+        // ===== الدور التالي =====
+        window.nextRound = function() {
+            if (!gameData) return;
+            
+            for (let id in gameData.players) {
+                if (gameData.players[id].score >= 5) {
+                    const updates = {};
+                    for (let playerId in gameData.players) {
+                        updates[`games/${gameCode}/players/${playerId}/score`] = 0;
+                    }
+                    updates[`games/${gameCode}/status`] = 'waiting';
+                    updates[`games/${gameCode}/round`] = 0;
+                    updates[`games/${gameCode}/answers`] = {};
+                    updates[`games/${gameCode}/votes`] = {};
+                    update(ref(database), updates);
+                    return;
+                }
+            }
+            
+            window.startGame();
+        };
+
+        // ===== نسخ الرابط =====
+        window.copyGameLink = function() {
+            const linkInput = document.getElementById('gameLink');
+            if (linkInput) {
+                linkInput.select();
+                navigator.clipboard.writeText(linkInput.value);
+                alert('✅ تم نسخ الرابط!');
+            }
+        };
+
+        // ===== شاشة الدخول =====
+        function renderJoinScreen() {
+            const appDiv = document.getElementById('app');
+            appDiv.innerHTML = `
+                <div class="game-header">
+                    <h1>🎮 برا السالفة</h1>
+                </div>
+                
+                <div class="join-section">
+                    <h2>🔑 انضم للعبة</h2>
+                    <input type="text" id="playerName" placeholder="اسمك" maxlength="20" value="${playerName || ''}">
+                    <input type="text" id="gameCode" placeholder="كود الغرفة (مثال: 1234)" value="${joinCode || ''}">
+                    <button onclick="window.joinGame()">انضم للعبة</button>
+                </div>
+
+                <div class="create-section">
+                    <h2>🎲 أو اصنع غرفة جديدة</h2>
+                    <button onclick="window.createGame()">اصنع غرفة جديدة</button>
+                </div>
+            `;
+        }
+
+        // ===== شاشة اللعبة =====
+        function renderGameScreen() {
+            if (!gameData) return;
+            
+            const players = gameData.players || {};
+            const currentPlayer = players[playerId];
+            const isHost = currentPlayer?.isHost || false;
+            
+            const header = `
+                <div class="game-header">
+                    <h1>🎮 برا السالفة</h1>
+                    <div class="header-buttons">
+                        <div class="game-info">
+                            <span>🔑 ${gameCode}</span>
+                            <span>📊 ${gameData.round || 0}</span>
+                        </div>
+                        <button class="exit-btn" onclick="window.leaveGame()">🚪 خروج</button>
+                    </div>
+                </div>
+            `;
+            
+            let playersList = '<div class="players-list">';
+            for (let id in players) {
+                const player = players[id];
+                playersList += `
+                    <div class="player-card ${player.isHost ? 'host' : ''}">
+                        <div class="player-name">${player.name}</div>
+                        <div class="score">${player.score || 0} نقطة</div>
+                        ${player.isHost ? '<span class="host-badge">👑 ماستر</span>' : ''}
+                        ${id === playerId ? '<span class="you-badge">أنت</span>' : ''}
+                        ${isHost && id !== playerId && gameData.status === 'waiting' ? 
+                            `<div class="player-actions"><button class="kick-btn" onclick="window.kickPlayer('${id}')">❌ طرد</button></div>` : ''}
+                    </div>
+                `;
+            }
+            playersList += '</div>';
+            
+            let content = '';
+            
+            switch(gameData.status) {
+                case 'waiting':
+                    content = renderWaitingScreen(Object.keys(players).length, isHost);
+                    break;
+                case 'playing':
+                    content = renderPlayingScreen();
+                    break;
+                case 'answers':
+                case 'voting':
+                    content = renderAnswersScreen();
+                    break;
+                case 'result':
+                    content = renderResultScreen();
+                    break;
+                default:
+                    content = '<div>...</div>';
+            }
+            
+            document.getElementById('app').innerHTML = header + playersList + content;
+        }
+
+        function renderWaitingScreen(playerCount, isHost) {
+            let html = `
+                <div class="screen active">
+                    <h2 style="text-align: center; margin: 20px 0;">⏳ في انتظار لاعبين...</h2>
+                    <p style="text-align: center; font-size: 1.2em;">اللاعبون: ${playerCount}</p>
+            `;
+            
+            if (isHost && playerCount >= 2) {
+                html += `<button onclick="window.startGame()" style="width: auto; margin: 20px auto; display: block; padding: 15px 40px;">🚀 ابدأ اللعبة!</button>`;
+            }
+            
+            const gameLink = window.location.href.split('?')[0] + `?join=${gameCode}`;
+            html += `
+                <div style="margin-top: 30px;">
+                    <p style="margin-bottom: 10px;">🔗 رابط الدعوة:</p>
+                    <div class="link-box">
+                        <input type="text" value="${gameLink}" readonly id="gameLink">
+                        <button class="copy-btn" onclick="copyGameLink()">نسخ</button>
+                    </div>
+                </div>
+            </div>`;
+            
+            return html;
+        }
+
+        function renderPlayingScreen() {
+            const isImposter = playerId === gameData.imposterId;
+            const question = isImposter ? gameData.imposterQuestion : gameData.currentQuestion;
+            const answersCount = Object.keys(gameData.answers || {}).length;
+            const totalPlayers = Object.keys(gameData.players).length;
+            const hasAnswered = gameData.answers?.[playerId] ? true : false;
+            
+            return `
+                <div class="screen active">
+                    <div class="question-box">
+                        <h3>${isImposter ? '🕵️ أنت برا السالفة!' : '❓ السؤال:'}</h3>
+                        <p>${question || '...'}</p>
+                    </div>
+                    
+                    <div class="answer-input">
+                        <input type="text" id="answerInput" placeholder="اكتب إجابتك هنا..." maxlength="50" ${hasAnswered ? 'disabled' : ''}>
+                        <button onclick="window.submitAnswer()" ${hasAnswered ? 'disabled' : ''}>
+                            ${hasAnswered ? 'تم الإرسال' : 'إرسال الإجابة'}
+                        </button>
+                    </div>
+                    
+                    <div class="answers-status">
+                        <p>تمت الإجابة: ${answersCount}/${totalPlayers}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAnswersScreen() {
+            let answers = '';
+            for (let id in gameData.answers) {
+                const player = gameData.players[id];
+                const answer = gameData.answers[id];
+                answers += `
+                    <div class="answer-card">
+                        <div class="player-name">${player.name}</div>
+                        <div class="answer-text">"${answer}"</div>
+                    </div>
+                `;
+            }
+            
+            let votingSection = '';
+            if (gameData.status === 'voting') {
+                let votingButtons = '';
+                for (let id in gameData.players) {
+                    if (id !== playerId) {
+                        const player = gameData.players[id];
+                        const hasVoted = gameData.votes?.[playerId] ? true : false;
+                        votingButtons += `<button class="vote-btn" onclick="window.submitVote('${id}')" ${hasVoted ? 'disabled' : ''}>${player.name}</button>`;
+                    }
+                }
+                
+                votingSection = `
+                    <div class="voting-section">
+                        <h3>⚠️ من هو برا السالفة؟</h3>
+                        <div id="votingTimer">5</div>
+                        <div id="votingButtons">${votingButtons}</div>
+                    </div>
+                `;
+                
+                setTimeout(() => startVotingTimer(), 100);
+            }
+            
+            return `
+                <div class="screen active">
+                    <div class="reveal-section">
+                        <button id="revealQuestionBtn" onclick="window.revealQuestion()" ${gameData.status !== 'answers' ? 'disabled' : ''}>
+                            🔍 كشف السؤال الحقيقي
+                        </button>
+                    </div>
+                    
+                    <div class="answers-display">${answers}</div>
+                    
+                    ${votingSection}
+                </div>
+            `;
+        }
+
+        function renderResultScreen() {
+            const lastResult = gameData.lastResult;
+            if (!lastResult) return '<div>...</div>';
+            
+            const imposter = gameData.players[lastResult.imposterId];
+            
+            let winner = null;
+            for (let id in gameData.players) {
+                if (gameData.players[id].score >= 5) {
+                    winner = gameData.players[id];
+                    break;
+                }
+            }
+            
+            if (winner) {
+                return `
+                    <div class="screen active">
+                        <div class="game-winner">
+                            <h2>🏆 الفائز هو ${winner.name} 🏆</h2>
+                            <p>وصل إلى 5 نقاط</p>
+                        </div>
+                        <button id="nextRoundBtn" onclick="window.nextRound()">لعبة جديدة</button>
+                    </div>
+                `;
+            }
+            
+            return `
+                <div class="screen active">
+                    <div class="result-content">
+                        <div class="imposter-reveal">
+                            <h3>🕵️ برا السالفة: ${imposter.name}</h3>
+                            <p>سؤاله: ${gameData.imposterQuestion}</p>
+                        </div>
+                        
+                        <div class="${lastResult.caught ? 'winner-reveal' : 'imposter-reveal'}">
+                            ${lastResult.caught ? '✅ تم كشفه!' : '🏆 الامبوستر كسب!'}
+                        </div>
+                    </div>
+                    <button id="nextRoundBtn" onclick="window.nextRound()">الدور التالي</button>
+                </div>
+            `;
+        }
+
+        // ===== بدء التطبيق =====
+        async function startApp() {
+            const saved = localStorage.getItem('bra-alsalfa');
+            if (saved) {
+                try {
+                    const { playerId: savedId, gameCode: savedCode, playerName: savedName } = JSON.parse(saved);
+                    if (savedId && savedCode && savedName) {
+                        playerName = savedName;
+                        const connected = await connectToGame(savedCode, savedId);
+                        if (connected) {
+                            renderGameScreen();
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.log('Invalid saved data');
+                }
+            }
+            
+            renderJoinScreen();
+        }
+
+        window.addEventListener('beforeunload', () => {
+            cleanup();
+        });
+
+        startApp();
+    </script>
+</body>
+</html>
