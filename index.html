@@ -5,269 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>برا السالفة</title>
 
-<script type="module">
-
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
-import { getDatabase, ref, set, update, onValue, get } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js';
-import './questions.js';
-
-const firebaseConfig = {
-apiKey: "AIzaSyBgU2e3nrFc6k741ghQdB7UqqwNYaEvATk",
-authDomain: "bra-alsalfa.firebaseapp.com",
-databaseURL: "https://bra-alsalfa-default-rtdb.europe-west1.firebasedatabase.app"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-
-let gameCode=null;
-let playerId=null;
-let playerName=null;
-let gameData=null;
-
-function randId(){ return Math.random().toString(36).slice(2,9); }
-
-window.createRoom = async function(){
-playerName=document.getElementById("name").value.trim();
-if(!playerName)return alert("اكتب اسمك");
-
-gameCode=Math.floor(1000+Math.random()*9000).toString();
-playerId=randId();
-
-await set(ref(db,"games/"+gameCode),{
-status:"waiting",
-round:0,
-players:{
-[playerId]:{name:playerName,score:0,isHost:true}
-}
-});
-
-listen();
-}
-
-window.joinRoom = async function(){
-playerName=document.getElementById("name").value.trim();
-gameCode=document.getElementById("code").value.trim();
-if(!playerName||!gameCode)return alert("اكتب الاسم والكود");
-
-playerId=randId();
-
-await update(ref(db,"games/"+gameCode+"/players"),{
-[playerId]:{name:playerName,score:0,isHost:false}
-});
-
-listen();
-}
-
-function listen(){
-onValue(ref(db,"games/"+gameCode),snap=>{
-gameData=snap.val();
-render();
-});
-}
-
-window.startGame = async function(){
-if(!isHost())return;
-
-let ids=Object.keys(gameData.players);
-if(ids.length<2||ids.length>5)return alert("2-5 لاعبين");
-
-let imposter=ids[Math.floor(Math.random()*ids.length)];
-let q=QUESTIONS[Math.floor(Math.random()*QUESTIONS.length)];
-
-await update(ref(db,"games/"+gameCode),{
-status:"writing",
-round:gameData.round+1,
-imposterId:imposter,
-normalQuestion:q.normal,
-imposterQuestion:q.imposter,
-answers:{},
-votes:{}
-});
-}
-
-window.submitAnswer = async function(){
-let val=document.getElementById("answer").value.trim();
-if(!val)return;
-await update(ref(db,"games/"+gameCode+"/answers"),{
-[playerId]:val
-});
-}
-
-window.startVoting = async function(){
-if(!isHost())return;
-await update(ref(db,"games/"+gameCode),{status:"voting"});
-startTimer();
-}
-
-window.vote = async function(id){
-if(gameData.votes?.[playerId])return;
-await update(ref(db,"games/"+gameCode+"/votes"),{
-[playerId]:id
-});
-}
-
-function startTimer(){
-let t=5;
-let int=setInterval(()=>{
-document.getElementById("timer").innerText=t;
-t--;
-if(t<0){
-clearInterval(int);
-finishRound();
-}
-},1000);
-}
-
-async function finishRound(){
-if(!isHost())return;
-
-let votes=gameData.votes||{};
-let count={};
-Object.values(votes).forEach(v=>{
-count[v]=(count[v]||0)+1;
-});
-
-let accused=Object.keys(count).reduce((a,b)=>count[a]>count[b]?a:b);
-let imposter=gameData.imposterId;
-let updates={};
-
-if(accused===imposter){
-for(let v in votes){
-if(votes[v]===imposter){
-updates[`games/${gameCode}/players/${v}/score`]=(gameData.players[v].score||0)+1;
-}
-}
-updates[`games/${gameCode}/players/${imposter}/score`]=(gameData.players[imposter].score||0)-1;
-}else{
-updates[`games/${gameCode}/players/${imposter}/score`]=(gameData.players[imposter].score||0)+1;
-}
-
-updates[`games/${gameCode}/status`]="result";
-updates[`games/${gameCode}/lastVotes`]=votes;
-
-await update(ref(db),updates);
-}
-
-window.nextRound = async function(){
-if(!isHost())return;
-await update(ref(db,"games/"+gameCode),{status:"waiting"});
-}
-
-function isHost(){
-return gameData.players[playerId]?.isHost;
-}
-
-function render(){
-
-if(!gameData){
-document.body.innerHTML=home();
-return;
-}
-
-let players=Object.entries(gameData.players).map(([id,p])=>`
-<div class="card ${p.isHost?'host':''}">
-${p.name} (${p.score})
-${p.isHost?"👑":""}
-${isHost()&&!p.isHost?`<button onclick="kick('${id}')">طرد</button>`:""}
-</div>`).join("");
-
-let content="";
-
-switch(gameData.status){
-
-case "waiting":
-content=`<button onclick="startGame()">ابدأ الجولة</button>`;
-break;
-
-case "writing":
-let q=playerId===gameData.imposterId?
-gameData.imposterQuestion:
-gameData.normalQuestion;
-
-content=`
-<div class="question">${q}</div>
-<input id="answer" placeholder="اكتب إجابتك">
-<button onclick="submitAnswer()">إرسال</button>
-${isHost()?'<button onclick="startVoting()">بدء التصويت</button>':""}
-`;
-break;
-
-case "voting":
-let voteBtns=Object.entries(gameData.players)
-.filter(([id])=>id!==playerId)
-.map(([id,p])=>
-`<button class="vote ${gameData.votes?.[playerId]===id?'selected':''}"
-onclick="vote('${id}')">${p.name}</button>`).join("");
-
-content=`
-<div>السؤال الحقيقي: ${gameData.normalQuestion}</div>
-<div id="timer">5</div>
-${voteBtns}
-`;
-break;
-
-case "result":
-let votes=gameData.lastVotes||{};
-let breakdown=Object.entries(votes)
-.map(([v,t])=>`${gameData.players[v].name} ➜ ${gameData.players[t].name}`)
-.join("<br>");
-
-content=`
-<div>برا السالفة: ${gameData.players[gameData.imposterId].name}</div>
-<div>${breakdown}</div>
-${isHost()?'<button onclick="nextRound()">جولة جديدة</button>':""}
-`;
-break;
-}
-
-document.body.innerHTML=`
-<div class="container">
-<h2>🎭 برا السالفة | ${gameCode}</h2>
-<div class="players">${players}</div>
-${content}
-</div>`;
-}
-
-function home(){
-return `
-<div class="container">
-<h2>🎭 برا السالفة</h2>
-<input id="name" placeholder="اسمك">
-<input id="code" placeholder="كود الغرفة">
-<button onclick="createRoom()">إنشاء غرفة</button>
-<button onclick="joinRoom()">دخول غرفة</button>
-</div>`;
-}
-
-window.kick=async function(id){
-if(!isHost())return;
-await update(ref(db,"games/"+gameCode+"/players"),{
-[id]:null
-});
-}
-
-</script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script src="questions.js"></script>
 
 <style>
 body{
 margin:0;
 font-family:sans-serif;
-background:radial-gradient(circle,#141e30,#0f0c29);
+background:radial-gradient(circle,#1a1a2e,#0f0c29);
 color:white;
 display:flex;
 justify-content:center;
 align-items:center;
-height:100vh;
+min-height:100vh;
 }
 .container{
-background:rgba(255,255,255,0.05);
-backdrop-filter:blur(15px);
+background:rgba(255,255,255,0.07);
+backdrop-filter:blur(10px);
 padding:20px;
 border-radius:20px;
 width:95%;
 max-width:500px;
-box-shadow:0 0 30px rgba(0,0,0,0.6);
+box-shadow:0 0 30px rgba(0,0,0,0.7);
 }
 input,button{
 width:100%;
@@ -282,28 +42,253 @@ background:linear-gradient(45deg,#667eea,#764ba2);
 color:white;
 font-weight:bold;
 }
-button:hover{
-opacity:0.9;
-}
+button:hover{opacity:0.9}
 .card{
 background:rgba(255,255,255,0.1);
 padding:10px;
 border-radius:10px;
 margin:5px 0;
 }
-.host{
-border:2px solid gold;
-}
-.vote.selected{
-background:#ff4d6d;
-}
-.question{
-font-size:18px;
-margin:15px 0;
-text-align:center;
-}
+.host{border:2px solid gold}
+.vote.selected{background:#ff4d6d}
+.question{text-align:center;margin:15px 0;font-size:18px}
 </style>
-
 </head>
-<body></body>
+<body>
+
+<div class="container" id="app"></div>
+
+<script>
+
+var firebaseConfig={
+apiKey:"AIzaSyBgU2e3nrFc6k741ghQdB7UqqwNYaEvATk",
+authDomain:"bra-alsalfa.firebaseapp.com",
+databaseURL:"https://bra-alsalfa-default-rtdb.europe-west1.firebasedatabase.app"
+};
+
+firebase.initializeApp(firebaseConfig);
+var db=firebase.database();
+
+let gameCode=null;
+let playerId=null;
+let playerName=null;
+let gameData=null;
+
+function rand(){return Math.random().toString(36).substr(2,9)}
+
+function renderHome(){
+document.getElementById("app").innerHTML=`
+<h2>🎭 برا السالفة</h2>
+<input id="name" placeholder="اسمك">
+<input id="code" placeholder="كود الغرفة">
+<button onclick="createRoom()">إنشاء غرفة</button>
+<button onclick="joinRoom()">دخول غرفة</button>
+`;
+}
+
+function listen(){
+firebase.database().ref("games/"+gameCode).on("value",snap=>{
+gameData=snap.val();
+if(!gameData){ renderHome(); return; }
+renderGame();
+});
+}
+
+function createRoom(){
+playerName=document.getElementById("name").value.trim();
+if(!playerName)return alert("اكتب اسمك");
+
+gameCode=Math.floor(1000+Math.random()*9000).toString();
+playerId=rand();
+
+firebase.database().ref("games/"+gameCode).set({
+status:"waiting",
+round:0,
+players:{
+[playerId]:{name:playerName,score:0,isHost:true}
+}
+});
+
+listen();
+}
+
+function joinRoom(){
+playerName=document.getElementById("name").value.trim();
+gameCode=document.getElementById("code").value.trim();
+if(!playerName||!gameCode)return alert("اكتب الاسم والكود");
+
+playerId=rand();
+
+firebase.database().ref("games/"+gameCode+"/players/"+playerId).set({
+name:playerName,score:0,isHost:false
+});
+
+listen();
+}
+
+function isHost(){
+return gameData.players[playerId]?.isHost;
+}
+
+function startGame(){
+if(!isHost())return;
+
+let ids=Object.keys(gameData.players);
+if(ids.length<2||ids.length>5)return alert("2-5 لاعبين");
+
+let imp=ids[Math.floor(Math.random()*ids.length)];
+let q=QUESTIONS[Math.floor(Math.random()*QUESTIONS.length)];
+
+firebase.database().ref("games/"+gameCode).update({
+status:"writing",
+imposterId:imp,
+normalQuestion:q.normal,
+imposterQuestion:q.imposter,
+answers:{},
+votes:{}
+});
+}
+
+function submitAnswer(){
+let val=document.getElementById("answer").value.trim();
+if(!val)return;
+firebase.database().ref("games/"+gameCode+"/answers/"+playerId).set(val);
+}
+
+function startVoting(){
+if(!isHost())return;
+firebase.database().ref("games/"+gameCode).update({status:"voting"});
+startTimer();
+}
+
+function vote(id){
+if(gameData.votes?.[playerId])return;
+firebase.database().ref("games/"+gameCode+"/votes/"+playerId).set(id);
+}
+
+function startTimer(){
+let t=5;
+let int=setInterval(()=>{
+let el=document.getElementById("timer");
+if(el)el.innerText=t;
+t--;
+if(t<0){clearInterval(int);finishRound();}
+},1000);
+}
+
+function finishRound(){
+if(!isHost())return;
+
+let votes=gameData.votes||{};
+let count={};
+for(let v in votes){
+count[votes[v]]=(count[votes[v]]||0)+1;
+}
+
+let accused=null,max=0;
+for(let id in count){
+if(count[id]>max){max=count[id];accused=id;}
+}
+
+let imp=gameData.imposterId;
+let updates={};
+
+if(accused===imp){
+for(let v in votes){
+if(votes[v]===imp){
+let s=gameData.players[v].score||0;
+updates["games/"+gameCode+"/players/"+v+"/score"]=s+1;
+}
+}
+let s=gameData.players[imp].score||0;
+updates["games/"+gameCode+"/players/"+imp+"/score"]=s-1;
+}else{
+let s=gameData.players[imp].score||0;
+updates["games/"+gameCode+"/players/"+imp+"/score"]=s+1;
+}
+
+updates["games/"+gameCode+"/status"]="result";
+updates["games/"+gameCode+"/lastVotes"]=votes;
+
+firebase.database().ref().update(updates);
+}
+
+function nextRound(){
+if(!isHost())return;
+firebase.database().ref("games/"+gameCode).update({status:"waiting"});
+}
+
+function renderGame(){
+
+let playersHTML="";
+for(let id in gameData.players){
+let p=gameData.players[id];
+playersHTML+=`
+<div class="card ${p.isHost?'host':''}">
+${p.name} (${p.score})
+${p.isHost?"👑":""}
+</div>`;
+}
+
+let content="";
+
+switch(gameData.status){
+
+case "waiting":
+content=isHost()?`<button onclick="startGame()">ابدأ الجولة</button>`:"بانتظار الماستر";
+break;
+
+case "writing":
+let q=(playerId===gameData.imposterId)?
+gameData.imposterQuestion:
+gameData.normalQuestion;
+
+content=`
+<div class="question">${q}</div>
+<input id="answer" placeholder="اكتب إجابتك">
+<button onclick="submitAnswer()">إرسال</button>
+${isHost()?'<button onclick="startVoting()">بدء التصويت</button>':""}
+`;
+break;
+
+case "voting":
+let btns="";
+for(let id in gameData.players){
+if(id!==playerId){
+btns+=`<button class="vote ${gameData.votes?.[playerId]===id?'selected':''}" onclick="vote('${id}')">${gameData.players[id].name}</button>`;
+}
+}
+content=`
+<div>السؤال الحقيقي: ${gameData.normalQuestion}</div>
+<div id="timer">5</div>
+${btns}
+`;
+break;
+
+case "result":
+let votes=gameData.lastVotes||{};
+let breakdown="";
+for(let v in votes){
+breakdown+=`${gameData.players[v].name} ➜ ${gameData.players[votes[v]].name}<br>`;
+}
+content=`
+<div>برا السالفة: ${gameData.players[gameData.imposterId].name}</div>
+<div>${breakdown}</div>
+${isHost()?'<button onclick="nextRound()">جولة جديدة</button>':""}
+`;
+break;
+}
+
+document.getElementById("app").innerHTML=`
+<h2>🎭 برا السالفة | ${gameCode}</h2>
+${playersHTML}
+${content}
+`;
+}
+
+renderHome();
+
+</script>
+
+</body>
 </html>
