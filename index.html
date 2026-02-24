@@ -5,279 +5,305 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>برا السالفة</title>
 
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-<script src="questions.js"></script>
+<script type="module">
 
-<style>
-body{
-    font-family: sans-serif;
-    background:#111;
-    color:white;
-    margin:0;
-    text-align:center;
-}
-.container{
-    padding:20px;
-    max-width:500px;
-    margin:auto;
-}
-input,button{
-    padding:10px;
-    margin:5px;
-    width:90%;
-    border:none;
-    border-radius:6px;
-}
-button{
-    background:#00b894;
-    color:white;
-    font-weight:bold;
-}
-.player{
-    background:#222;
-    margin:5px;
-    padding:5px;
-    border-radius:5px;
-}
-.hidden{display:none;}
-.timer{
-    font-size:20px;
-    color:#ff7675;
-}
-</style>
-</head>
-<body>
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+import { getDatabase, ref, set, update, onValue, get } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js';
+import './questions.js';
 
-<div class="container" id="home">
-<h2>🎭 برا السالفة</h2>
-<input id="name" placeholder="اسمك">
-<input id="room" placeholder="كود الغرفة">
-<button onclick="createRoom()">إنشاء غرفة</button>
-<button onclick="joinRoom()">دخول غرفة</button>
-</div>
-
-<div class="container hidden" id="lobby">
-<h3>اللاعبين</h3>
-<div id="players"></div>
-<button id="startBtn" onclick="startGame()">ابدأ اللعبة</button>
-</div>
-
-<div class="container hidden" id="game">
-<h3 id="questionTitle"></h3>
-<input id="answer" placeholder="اكتب إجابتك">
-<button onclick="submitAnswer()">إرسال</button>
-</div>
-
-<div class="container hidden" id="reveal">
-<h3>السؤال الحقيقي:</h3>
-<h2 id="realQuestion"></h2>
-<div class="timer" id="timer"></div>
-<div id="votePlayers"></div>
-</div>
-
-<script>
-var firebaseConfig = {
-apiKey:"AIzaSyBgU2e3nrFc6k741ghQdB7UqqwNYaEvATk",
-authDomain:"bra-alsalfa.firebaseapp.com",
-databaseURL:"https://bra-alsalfa-default-rtdb.europe-west1.firebasedatabase.app"
+const firebaseConfig = {
+apiKey: "AIzaSyBgU2e3nrFc6k741ghQdB7UqqwNYaEvATk",
+authDomain: "bra-alsalfa.firebaseapp.com",
+databaseURL: "https://bra-alsalfa-default-rtdb.europe-west1.firebasedatabase.app"
 };
-firebase.initializeApp(firebaseConfig);
-var db = firebase.database();
 
-let playerName;
-let roomCode;
-let isMaster=false;
-let myId = Math.random().toString(36).substr(2,9);
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
-function createRoom(){
-playerName=document.getElementById("name").value;
-roomCode=document.getElementById("room").value;
-if(!playerName||!roomCode) return alert("اكتب الاسم والكود");
+let gameCode=null;
+let playerId=null;
+let playerName=null;
+let gameData=null;
 
-isMaster=true;
+function randId(){ return Math.random().toString(36).slice(2,9); }
 
-db.ref("rooms/"+roomCode).set({
-master:myId,
-state:"lobby",
-players:{}
+window.createRoom = async function(){
+playerName=document.getElementById("name").value.trim();
+if(!playerName)return alert("اكتب اسمك");
+
+gameCode=Math.floor(1000+Math.random()*9000).toString();
+playerId=randId();
+
+await set(ref(db,"games/"+gameCode),{
+status:"waiting",
+round:0,
+players:{
+[playerId]:{name:playerName,score:0,isHost:true}
+}
 });
 
-joinRoom();
+listen();
 }
 
-function joinRoom(){
-playerName=document.getElementById("name").value;
-roomCode=document.getElementById("room").value;
-if(!playerName||!roomCode) return alert("اكتب الاسم والكود");
+window.joinRoom = async function(){
+playerName=document.getElementById("name").value.trim();
+gameCode=document.getElementById("code").value.trim();
+if(!playerName||!gameCode)return alert("اكتب الاسم والكود");
 
-db.ref("rooms/"+roomCode+"/players/"+myId).set({
-name:playerName,
-score:0
+playerId=randId();
+
+await update(ref(db,"games/"+gameCode+"/players"),{
+[playerId]:{name:playerName,score:0,isHost:false}
 });
 
-listenRoom();
-document.getElementById("home").classList.add("hidden");
-document.getElementById("lobby").classList.remove("hidden");
+listen();
 }
 
-function listenRoom(){
-db.ref("rooms/"+roomCode).on("value",snap=>{
-let data=snap.val();
-if(!data)return;
-
-let playersDiv=document.getElementById("players");
-playersDiv.innerHTML="";
-for(let id in data.players){
-let p=data.players[id];
-playersDiv.innerHTML+=`<div class="player">${p.name} - ${p.score}</div>`;
-}
-
-if(data.state==="game"){
-document.getElementById("lobby").classList.add("hidden");
-document.getElementById("game").classList.remove("hidden");
-
-let q=data.questions[myId];
-document.getElementById("questionTitle").innerText=q;
-}
-
-if(data.state==="reveal"){
-showReveal(data);
-}
-
-if(data.state==="end"){
-alert(data.winner+" فاز 🎉");
-location.reload();
-}
+function listen(){
+onValue(ref(db,"games/"+gameCode),snap=>{
+gameData=snap.val();
+render();
 });
 }
 
-function startGame(){
-let roomRef=db.ref("rooms/"+roomCode);
-roomRef.once("value").then(snap=>{
-let data=snap.val();
-let ids=Object.keys(data.players);
+window.startGame = async function(){
+if(!isHost())return;
+
+let ids=Object.keys(gameData.players);
 if(ids.length<2||ids.length>5)return alert("2-5 لاعبين");
 
 let imposter=ids[Math.floor(Math.random()*ids.length)];
-let q=questions[Math.floor(Math.random()*questions.length)];
+let q=QUESTIONS[Math.floor(Math.random()*QUESTIONS.length)];
 
-let questionMap={};
-ids.forEach(id=>{
-if(id===imposter){
-questionMap[id]=q.fake;
-}else{
-questionMap[id]=q.real;
-}
-});
-
-roomRef.update({
-state:"game",
-imposter:imposter,
-questions:questionMap,
+await update(ref(db,"games/"+gameCode),{
+status:"writing",
+round:gameData.round+1,
+imposterId:imposter,
+normalQuestion:q.normal,
+imposterQuestion:q.imposter,
 answers:{},
 votes:{}
 });
+}
+
+window.submitAnswer = async function(){
+let val=document.getElementById("answer").value.trim();
+if(!val)return;
+await update(ref(db,"games/"+gameCode+"/answers"),{
+[playerId]:val
 });
 }
 
-function submitAnswer(){
-let val=document.getElementById("answer").value;
-db.ref("rooms/"+roomCode+"/answers/"+myId).set(val);
-document.getElementById("answer").disabled=true;
-
-db.ref("rooms/"+roomCode+"/answers").once("value").then(snap=>{
-if(Object.keys(snap.val()||{}).length>=2){
-db.ref("rooms/"+roomCode).update({state:"reveal"});
-}
-});
-}
-
-function showReveal(data){
-document.getElementById("game").classList.add("hidden");
-document.getElementById("reveal").classList.remove("hidden");
-
-document.getElementById("realQuestion").innerText=
-questions.find(q=>q.real===data.questions[data.master]||true).real;
-
-let voteDiv=document.getElementById("votePlayers");
-voteDiv.innerHTML="";
-for(let id in data.players){
-voteDiv.innerHTML+=
-`<button onclick="vote('${id}')">${data.players[id].name}</button>`;
-}
-
+window.startVoting = async function(){
+if(!isHost())return;
+await update(ref(db,"games/"+gameCode),{status:"voting"});
 startTimer();
 }
 
-function vote(id){
-db.ref("rooms/"+roomCode+"/votes/"+myId).set(id);
+window.vote = async function(id){
+if(gameData.votes?.[playerId])return;
+await update(ref(db,"games/"+gameCode+"/votes"),{
+[playerId]:id
+});
 }
 
 function startTimer(){
-let time=5;
-let t=document.getElementById("timer");
-let interval=setInterval(()=>{
-t.innerText="التصويت ينتهي بعد "+time+" ث";
-time--;
-if(time<0){
-clearInterval(interval);
+let t=5;
+let int=setInterval(()=>{
+document.getElementById("timer").innerText=t;
+t--;
+if(t<0){
+clearInterval(int);
 finishRound();
 }
 },1000);
 }
 
-function finishRound(){
-db.ref("rooms/"+roomCode).once("value").then(snap=>{
-let data=snap.val();
-let votes=data.votes||{};
+async function finishRound(){
+if(!isHost())return;
+
+let votes=gameData.votes||{};
 let count={};
-for(let v in votes){
-let target=votes[v];
-count[target]=(count[target]||0)+1;
-}
-let max=0;
-let accused=null;
-for(let id in count){
-if(count[id]>max){
-max=count[id];
-accused=id;
-}
-}
-let imposter=data.imposter;
+Object.values(votes).forEach(v=>{
+count[v]=(count[v]||0)+1;
+});
+
+let accused=Object.keys(count).reduce((a,b)=>count[a]>count[b]?a:b);
+let imposter=gameData.imposterId;
+let updates={};
 
 if(accused===imposter){
 for(let v in votes){
 if(votes[v]===imposter){
-db.ref("rooms/"+roomCode+"/players/"+v+"/score")
-.transaction(s=> (s||0)+1);
+updates[`games/${gameCode}/players/${v}/score`]=(gameData.players[v].score||0)+1;
 }
 }
-db.ref("rooms/"+roomCode+"/players/"+imposter+"/score")
-.transaction(s=> (s||0)-1);
+updates[`games/${gameCode}/players/${imposter}/score`]=(gameData.players[imposter].score||0)-1;
 }else{
-db.ref("rooms/"+roomCode+"/players/"+imposter+"/score")
-.transaction(s=> (s||0)+1);
+updates[`games/${gameCode}/players/${imposter}/score`]=(gameData.players[imposter].score||0)+1;
 }
 
-checkWinner();
+updates[`games/${gameCode}/status`]="result";
+updates[`games/${gameCode}/lastVotes`]=votes;
+
+await update(ref(db),updates);
+}
+
+window.nextRound = async function(){
+if(!isHost())return;
+await update(ref(db,"games/"+gameCode),{status:"waiting"});
+}
+
+function isHost(){
+return gameData.players[playerId]?.isHost;
+}
+
+function render(){
+
+if(!gameData){
+document.body.innerHTML=home();
+return;
+}
+
+let players=Object.entries(gameData.players).map(([id,p])=>`
+<div class="card ${p.isHost?'host':''}">
+${p.name} (${p.score})
+${p.isHost?"👑":""}
+${isHost()&&!p.isHost?`<button onclick="kick('${id}')">طرد</button>`:""}
+</div>`).join("");
+
+let content="";
+
+switch(gameData.status){
+
+case "waiting":
+content=`<button onclick="startGame()">ابدأ الجولة</button>`;
+break;
+
+case "writing":
+let q=playerId===gameData.imposterId?
+gameData.imposterQuestion:
+gameData.normalQuestion;
+
+content=`
+<div class="question">${q}</div>
+<input id="answer" placeholder="اكتب إجابتك">
+<button onclick="submitAnswer()">إرسال</button>
+${isHost()?'<button onclick="startVoting()">بدء التصويت</button>':""}
+`;
+break;
+
+case "voting":
+let voteBtns=Object.entries(gameData.players)
+.filter(([id])=>id!==playerId)
+.map(([id,p])=>
+`<button class="vote ${gameData.votes?.[playerId]===id?'selected':''}"
+onclick="vote('${id}')">${p.name}</button>`).join("");
+
+content=`
+<div>السؤال الحقيقي: ${gameData.normalQuestion}</div>
+<div id="timer">5</div>
+${voteBtns}
+`;
+break;
+
+case "result":
+let votes=gameData.lastVotes||{};
+let breakdown=Object.entries(votes)
+.map(([v,t])=>`${gameData.players[v].name} ➜ ${gameData.players[t].name}`)
+.join("<br>");
+
+content=`
+<div>برا السالفة: ${gameData.players[gameData.imposterId].name}</div>
+<div>${breakdown}</div>
+${isHost()?'<button onclick="nextRound()">جولة جديدة</button>':""}
+`;
+break;
+}
+
+document.body.innerHTML=`
+<div class="container">
+<h2>🎭 برا السالفة | ${gameCode}</h2>
+<div class="players">${players}</div>
+${content}
+</div>`;
+}
+
+function home(){
+return `
+<div class="container">
+<h2>🎭 برا السالفة</h2>
+<input id="name" placeholder="اسمك">
+<input id="code" placeholder="كود الغرفة">
+<button onclick="createRoom()">إنشاء غرفة</button>
+<button onclick="joinRoom()">دخول غرفة</button>
+</div>`;
+}
+
+window.kick=async function(id){
+if(!isHost())return;
+await update(ref(db,"games/"+gameCode+"/players"),{
+[id]:null
 });
 }
 
-function checkWinner(){
-db.ref("rooms/"+roomCode+"/players").once("value").then(snap=>{
-let players=snap.val();
-for(let id in players){
-if(players[id].score>=5){
-db.ref("rooms/"+roomCode).update({
-state:"end",
-winner:players[id].name
-});
-}
-}
-db.ref("rooms/"+roomCode).update({state:"lobby"});
-});
-}
 </script>
-</body>
+
+<style>
+body{
+margin:0;
+font-family:sans-serif;
+background:radial-gradient(circle,#141e30,#0f0c29);
+color:white;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+}
+.container{
+background:rgba(255,255,255,0.05);
+backdrop-filter:blur(15px);
+padding:20px;
+border-radius:20px;
+width:95%;
+max-width:500px;
+box-shadow:0 0 30px rgba(0,0,0,0.6);
+}
+input,button{
+width:100%;
+padding:12px;
+margin:6px 0;
+border:none;
+border-radius:10px;
+font-size:16px;
+}
+button{
+background:linear-gradient(45deg,#667eea,#764ba2);
+color:white;
+font-weight:bold;
+}
+button:hover{
+opacity:0.9;
+}
+.card{
+background:rgba(255,255,255,0.1);
+padding:10px;
+border-radius:10px;
+margin:5px 0;
+}
+.host{
+border:2px solid gold;
+}
+.vote.selected{
+background:#ff4d6d;
+}
+.question{
+font-size:18px;
+margin:15px 0;
+text-align:center;
+}
+</style>
+
+</head>
+<body></body>
 </html>
