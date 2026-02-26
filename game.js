@@ -1,31 +1,28 @@
-let roomId=null;
 let uid=null;
+let room=null;
 let isMaster=false;
 
-auth.onAuthStateChanged(user=>{
-if(user) uid=user.uid;
+auth.onAuthStateChanged(u=>{ if(u) uid=u.uid; });
+
+firebase.database().ref(".info/connected").on("value",s=>{
+document.getElementById("status").innerText=
+s.val()?"🟢":"🔴";
 });
 
-firebase.database().ref(".info/connected").on("value",snap=>{
-document.getElementById("connectionStatus").innerText =
-snap.val() ? "🟢 متصل" : "🔴 غير متصل";
-});
-
-function randomRoomID(){
-return Math.floor(1000 + Math.random()*9000).toString();
+function randomRoom(){
+return Math.floor(1000+Math.random()*9000).toString();
 }
 
 function createRoom(){
-const name=document.getElementById("playerName").value.trim();
-if(!name) return alert("اكتب اسمك");
+const name=nameInput();
+if(!name) return;
 
-roomId=randomRoomID();
-isMaster=true;
+room=randomRoom();
 
-db.ref("rooms/"+roomId).set({
+db.ref("rooms/"+room).set({
 master:uid,
 state:"waiting",
-round:0
+resultCalculated:false
 });
 
 addPlayer(name);
@@ -33,220 +30,254 @@ enterRoom();
 }
 
 function joinRoom(){
-const name=document.getElementById("playerName").value.trim();
-roomId=document.getElementById("roomCodeInput").value.trim();
-if(!name||!roomId) return;
-
+const name=nameInput();
+room=document.getElementById("roomInput").value.trim();
+if(!name||!room) return;
 addPlayer(name);
 enterRoom();
 }
 
+function nameInput(){
+return document.getElementById("name").value.trim();
+}
+
 function addPlayer(name){
-db.ref("rooms/"+roomId+"/players/"+uid).set({
+db.ref("rooms/"+room+"/players/"+uid).set({
 name:name,
 points:0,
 online:true
 });
-
-db.ref("rooms/"+roomId+"/players/"+uid+"/online").onDisconnect().set(false);
+db.ref("rooms/"+room+"/players/"+uid+"/online").onDisconnect().set(false);
 }
 
 function enterRoom(){
 document.getElementById("home").classList.add("hidden");
 document.getElementById("game").classList.remove("hidden");
-document.getElementById("roomCode").innerText="الغرفة: "+roomId;
-listenRoom();
+document.getElementById("roomCode").innerText="الغرفة: "+room;
+listen();
 }
 
 function leaveRoom(){
-db.ref("rooms/"+roomId+"/players/"+uid).remove();
+db.ref("rooms/"+room+"/players/"+uid).remove();
 location.reload();
 }
 
-function listenRoom(){
-db.ref("rooms/"+roomId).on("value",snap=>{
-const data=snap.val();
-if(!data) return;
+function listen(){
+db.ref("rooms/"+room).on("value",snap=>{
+const d=snap.val();
+if(!d) return;
 
-isMaster=(data.master===uid);
-renderPlayers(data.players);
-handleState(data);
+isMaster=(d.master===uid);
+
+renderPlayers(d);
+handleState(d);
 });
 }
 
-function renderPlayers(players){
-const container=document.getElementById("players");
-container.innerHTML="";
-if(!players) return;
+function renderPlayers(d){
+const pDiv=document.getElementById("players");
+pDiv.innerHTML="";
 
-const sorted=Object.entries(players).sort((a,b)=>b[1].points-a[1].points);
+if(!d.players) return;
+
+const sorted=Object.entries(d.players)
+.sort((a,b)=>b[1].points-a[1].points);
 
 sorted.forEach(([id,p])=>{
-const div=document.createElement("div");
-div.className="playerCard";
-div.innerHTML=`
-<span>${p.name} ${p.online?"🟢":"🔴"}</span>
-<span>⭐ ${p.points}</span>
-`;
-container.appendChild(div);
+let mark="";
+if(d.state==="writing" && d.answers && d.answers[id]) mark="✔";
+
+let kick="";
+if(isMaster && id!==uid)
+kick=`<button onclick="kick('${id}')">❌</button>`;
+
+pDiv.innerHTML+=`
+<div class="player">
+<span>${p.name} ${p.online?"🟢":"🔴"} ${mark}</span>
+<span>${p.points}</span>
+${kick}
+</div>`;
 });
 }
 
-function handleState(data){
-const state=data.state;
-
-if(state==="waiting" && isMaster){
-showMasterStart();
-}
-
-if(state==="writing"){
-startWriting(data);
-}
-
-if(state==="reveal_answers"){
-revealAnswers(data);
-}
-
-if(state==="voting"){
-startVoting(data);
-}
-
-if(state==="results"){
-showResults(data);
+function kick(id){
+if(confirm("طرد اللاعب؟")){
+db.ref("rooms/"+room+"/players/"+id).remove();
+db.ref("rooms/"+room+"/answers/"+id).remove();
+db.ref("rooms/"+room+"/votes/"+id).remove();
 }
 }
 
-function showMasterStart(){
-document.getElementById("controls").innerHTML=
-'<button onclick="startRound()">بدء الجولة</button>';
+function handleState(d){
+clearUI();
+
+if(d.state==="waiting" && isMaster){
+controls(`<button onclick="startRound()">بدء الجولة</button>`);
+}
+
+if(d.state==="writing"){
+showQuestion(d);
+}
+
+if(d.state==="reveal_answers"){
+showAnswers(d);
+}
+
+if(d.state==="reveal_majority"){
+showMajority(d);
+}
+
+if(d.state==="voting"){
+showVoting(d);
+}
+
+if(d.state==="results"){
+showResults(d);
+}
+}
+
+function clearUI(){
+question.innerHTML="";
+answers.innerHTML="";
+voting.innerHTML="";
+controls("");
+answerBox.classList.add("hidden");
+}
+
+function controls(html){
+document.getElementById("controls").innerHTML=html;
 }
 
 function startRound(){
-const question=QUESTIONS[Math.floor(Math.random()*QUESTIONS.length)];
-const playersRef=db.ref("rooms/"+roomId+"/players");
+const q=QUESTIONS[Math.floor(Math.random()*QUESTIONS.length)];
 
-playersRef.once("value",snap=>{
-const players=Object.keys(snap.val());
-const imposter=players[Math.floor(Math.random()*players.length)];
+db.ref("rooms/"+room+"/players").once("value",snap=>{
+const ids=Object.keys(snap.val());
+const imp=ids[Math.floor(Math.random()*ids.length)];
 
-db.ref("rooms/"+roomId).update({
+db.ref("rooms/"+room).update({
 state:"writing",
-imposter:imposter,
-questionNormal:question.normal,
-questionImposter:question.imposter,
+imposter:imp,
+questionNormal:q.normal,
+questionImposter:q.imposter,
 answers:{},
-votes:{}
+votes:{},
+resultCalculated:false
 });
 });
 }
 
-function startWriting(data){
-document.getElementById("answerBox").classList.remove("hidden");
-document.getElementById("answersReveal").innerHTML="";
-document.getElementById("votingSection").innerHTML="";
-document.getElementById("controls").innerHTML="";
+function showQuestion(d){
+answerBox.classList.remove("hidden");
+const q=(uid===d.imposter)?d.questionImposter:d.questionNormal;
+question.innerText=q;
 
-const q = (uid===data.imposter)?data.questionImposter:data.questionNormal;
-document.getElementById("questionBox").innerText=q;
-
-if(isMaster){
-document.getElementById("controls").innerHTML=
-'<button onclick="revealAnswersState()">كشف الإجابات</button>';
-}
+if(isMaster)
+controls(`<button onclick="toReveal()">كشف الإجابات</button>`);
 }
 
 function sendAnswer(){
-const txt=document.getElementById("answerInput").value.trim();
-if(!txt) return alert("الإجابة إجبارية");
-
-db.ref("rooms/"+roomId+"/answers/"+uid).set(txt);
-document.getElementById("answerBox").classList.add("hidden");
+const t=answerInput.value.trim();
+if(!t) return alert("الإجابة إجبارية");
+db.ref("rooms/"+room+"/answers/"+uid).set(t);
+answerBox.classList.add("hidden");
 }
 
-function revealAnswersState(){
-db.ref("rooms/"+roomId).update({state:"reveal_answers"});
+function toReveal(){
+db.ref("rooms/"+room).update({state:"reveal_answers"});
 }
 
-function revealAnswers(data){
-document.getElementById("answersReveal").innerHTML="<h3>الإجابات:</h3>";
-if(!data.answers) return;
-
-Object.entries(data.answers).forEach(([id,ans])=>{
-const name=data.players[id].name;
-document.getElementById("answersReveal").innerHTML+=
-`<p><b>${name}:</b> ${ans}</p>`;
+function showAnswers(d){
+answers.innerHTML="<h3>الإجابات:</h3>";
+Object.entries(d.answers||{}).forEach(([id,a])=>{
+answers.innerHTML+=`<p>${d.players[id].name}: ${a}</p>`;
 });
-
-if(isMaster){
-document.getElementById("controls").innerHTML=
-'<button onclick="startVotingState()">بدء التصويت</button>';
-}
+if(isMaster)
+controls(`<button onclick="toMajority()">كشف سؤال الغالبية</button>`);
 }
 
-function startVotingState(){
-db.ref("rooms/"+roomId).update({state:"voting"});
+function toMajority(){
+db.ref("rooms/"+room).update({state:"reveal_majority"});
 }
 
-function startVoting(data){
-document.getElementById("votingSection").innerHTML="<h3>التصويت:</h3>";
-Object.entries(data.players).forEach(([id,p])=>{
-if(id===uid) return;
-document.getElementById("votingSection").innerHTML+=
+function showMajority(d){
+question.innerHTML="سؤال الغالبية: "+d.questionNormal;
+if(isMaster)
+controls(`<button onclick="toVoting()">بدء التصويت</button>`);
+}
+
+function toVoting(){
+db.ref("rooms/"+room).update({state:"voting"});
+}
+
+function showVoting(d){
+voting.innerHTML="<h3>التصويت:</h3>";
+Object.entries(d.players).forEach(([id,p])=>{
+if(id!==uid){
+voting.innerHTML+=
 `<button onclick="vote('${id}')">${p.name}</button>`;
+}
 });
-if(isMaster){
-document.getElementById("controls").innerHTML=
-'<button onclick="finishVoting()">إنهاء التصويت</button>';
-}
+
+let votesList="";
+Object.entries(d.votes||{}).forEach(([v,t])=>{
+votesList+=`<p>${d.players[v].name} ➜ ${d.players[t].name}</p>`;
+});
+voting.innerHTML+=votesList;
+
+if(isMaster)
+controls(`<button onclick="finish()">إنهاء التصويت</button>`);
 }
 
-function vote(target){
-if(target===uid) return;
-db.ref("rooms/"+roomId+"/votes/"+uid).set(target);
+function vote(id){
+if(id===uid) return;
+db.ref("rooms/"+room+"/votes/"+uid).set(id);
 }
 
-function finishVoting(){
-db.ref("rooms/"+roomId).update({state:"results"});
+function finish(){
+db.ref("rooms/"+room).update({state:"results"});
 }
 
-function showResults(data){
+function showResults(d){
+
+if(d.resultCalculated) return;
+
+db.ref("rooms/"+room+"/resultCalculated").set(true);
+
 let counts={};
-Object.values(data.votes||{}).forEach(v=>{
+Object.values(d.votes||{}).forEach(v=>{
 counts[v]=(counts[v]||0)+1;
 });
-let top=null,max=0;
+
 Object.entries(counts).forEach(([id,c])=>{
-if(c>max){max=c;top=id;}
+voting.innerHTML+=`<p>${d.players[id].name}: ${c} صوت</p>`;
 });
 
-let resultText="";
+const imp=d.imposter;
 
-if(top===data.imposter){
-resultText="تم كشف الامبوستر!";
-Object.entries(data.votes).forEach(([voter,target])=>{
-if(target===data.imposter){
-db.ref("rooms/"+roomId+"/players/"+voter+"/points").transaction(p=>(p||0)+1);
-}
-});
-db.ref("rooms/"+roomId+"/players/"+data.imposter+"/points")
-.transaction(p=>(p||0)-1);
-}else{
-resultText="لم يتم كشف الامبوستر!";
-db.ref("rooms/"+roomId+"/players/"+data.imposter+"/points")
+Object.entries(d.votes||{}).forEach(([v,t])=>{
+if(t===imp)
+db.ref("rooms/"+room+"/players/"+v+"/points")
 .transaction(p=>(p||0)+1);
+});
+
+if(counts[imp])
+db.ref("rooms/"+room+"/players/"+imp+"/points")
+.transaction(p=>(p||0)-1);
+else
+db.ref("rooms/"+room+"/players/"+imp+"/points")
+.transaction(p=>(p||0)+1);
+
+voting.innerHTML+=
+`<h2>الامبوستر هو: ${d.players[imp].name}</h2>
+<p>سؤاله: ${d.questionImposter}</p>`;
+
+if(isMaster)
+controls(`<button onclick="reset()">جولة جديدة</button>`);
 }
 
-document.getElementById("votingSection").innerHTML=
-"<h2>"+resultText+"</h2>";
-
-if(isMaster){
-document.getElementById("controls").innerHTML=
-'<button onclick="resetRound()">جولة جديدة</button>';
-}
-}
-
-function resetRound(){
-db.ref("rooms/"+roomId).update({
+function reset(){
+db.ref("rooms/"+room).update({
 state:"waiting",
 answers:{},
 votes:{}
