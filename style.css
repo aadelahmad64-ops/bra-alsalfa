@@ -1,0 +1,80 @@
+body{
+margin:0;
+font-family:'Cairo',sans-serif;
+background:linear-gradient(-45deg,#3a0ca3,#7209b7,#4361ee,#4cc9f0);
+background-size:400% 400%;
+animation:bg 12s ease infinite;
+color:white;
+}
+
+@keyframes bg{
+0%{background-position:0% 50%;}
+50%{background-position:100% 50%;}
+100%{background-position:0% 50%;}
+}
+
+.container{
+max-width:700px;
+margin:auto;
+padding:20px;
+text-align:center;
+}
+
+.logo{
+font-size:40px;
+margin-bottom:20px;
+text-shadow:0 0 15px #fff;
+}
+
+input{
+padding:12px;
+border-radius:10px;
+border:none;
+width:80%;
+margin:10px 0;
+font-size:16px;
+}
+
+button{
+padding:12px 20px;
+border:none;
+border-radius:12px;
+cursor:pointer;
+background:#ffffff22;
+color:white;
+backdrop-filter:blur(10px);
+border:1px solid #ffffff33;
+margin:5px;
+transition:0.3s;
+}
+
+button:hover{
+background:#ffffff55;
+}
+
+.hidden{display:none;}
+
+#playersList{
+margin-top:20px;
+}
+
+.playerCard{
+background:#ffffff11;
+padding:10px;
+margin:8px 0;
+border-radius:12px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+backdrop-filter:blur(8px);
+}
+
+.connection{
+position:fixed;
+top:10px;
+left:10px;
+background:#00000066;
+padding:8px 14px;
+border-radius:20px;
+font-size:14px;
+}
