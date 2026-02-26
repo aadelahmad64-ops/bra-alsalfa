@@ -13,36 +13,36 @@
 </head>
 <body>
 
-<div id="connectionStatus" class="connection">🟢</div>
+<div id="status">🟢</div>
 
 <div class="container">
-<h1 class="logo">برا السالفة</h1>
+
+<h1>برا السالفة</h1>
 
 <div id="home">
-<input id="playerName" placeholder="اسمك">
+<input id="name" placeholder="اسمك">
 <button onclick="createRoom()">إنشاء غرفة</button>
-<input id="roomCodeInput" placeholder="رمز الغرفة (4 أرقام)">
+<input id="roomInput" placeholder="رمز الغرفة">
 <button onclick="joinRoom()">دخول</button>
 </div>
 
 <div id="game" class="hidden">
 
-<div class="topBar">
+<div class="top">
 <span id="roomCode"></span>
 <button onclick="leaveRoom()">خروج</button>
 </div>
 
 <div id="players"></div>
-
-<div id="questionBox"></div>
+<div id="question"></div>
 
 <div id="answerBox" class="hidden">
 <textarea id="answerInput" placeholder="اكتب إجابتك"></textarea>
 <button onclick="sendAnswer()">إرسال</button>
 </div>
 
-<div id="answersReveal"></div>
-<div id="votingSection"></div>
+<div id="answers"></div>
+<div id="voting"></div>
 <div id="controls"></div>
 
 </div>
