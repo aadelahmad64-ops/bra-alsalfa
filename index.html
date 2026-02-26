@@ -10,20 +10,18 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-
 </head>
 <body>
 
-<div id="connectionStatus" class="connection">🟢 متصل</div>
+<div id="connectionStatus" class="connection">🟢</div>
 
 <div class="container">
-
 <h1 class="logo">برا السالفة</h1>
 
 <div id="home">
-<input id="playerName" placeholder="اكتب اسمك">
+<input id="playerName" placeholder="اسمك">
 <button onclick="createRoom()">إنشاء غرفة</button>
-<input id="roomCodeInput" placeholder="رمز الغرفة">
+<input id="roomCodeInput" placeholder="رمز الغرفة (4 أرقام)">
 <button onclick="joinRoom()">دخول</button>
 </div>
 
@@ -34,23 +32,24 @@
 <button onclick="leaveRoom()">خروج</button>
 </div>
 
-<div id="playersList"></div>
+<div id="players"></div>
 
-<div id="questionCard"></div>
+<div id="questionBox"></div>
 
-<div id="answersSection"></div>
+<div id="answerBox" class="hidden">
+<textarea id="answerInput" placeholder="اكتب إجابتك"></textarea>
+<button onclick="sendAnswer()">إرسال</button>
+</div>
 
+<div id="answersReveal"></div>
+<div id="votingSection"></div>
 <div id="controls"></div>
 
 </div>
-
 </div>
 
 <script src="firebase-config.js"></script>
-<script src="auth.js"></script>
 <script src="questions.js"></script>
 <script src="game.js"></script>
-<script src="ui.js"></script>
-
 </body>
 </html>
